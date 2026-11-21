@@ -1,0 +1,77 @@
+services:
+  broker:
+    image: eclipse-mosquitto:2
+    container_name: fogvision-broker
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+
+  camera-real:
+    build: ./camera-real
+    image: fogvision-camera-real
+    container_name: fogvision-camera-real
+    devices:
+      - "/dev/video0:/dev/video0"
+    environment:
+      CAMERA_ID: "cam-real"
+      FOG_INFERENCE_URL: "http://fog-inference:3000/infer"
+      FPS: "5"
+      RESOLUTION: "640x480"
+      VIDEO_DEVICE: "/dev/video0"
+    ports:
+      - "8082:8082"
+    depends_on:
+      - broker
+      - fog-inference
+    restart: unless-stopped
+    group_add:
+      - "video"
+
+  fog-inference:
+    build: ./fog-inference
+    image: fogvision-fog-inference
+    container_name: fogvision-fog-inference
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: '2G'
+    restart: unless-stopped
+
+  fog-node:
+    build: .
+    image: fogvision-app
+    container_name: fogvision-fog-node
+    environment:
+      ROLE: fog
+      NODE_ID: fog-1
+      CAMERAS: cam-real
+    depends_on:
+      - broker
+    restart: unless-stopped
+
+  gateway:
+    build: .
+    image: fogvision-app
+    container_name: fogvision-gateway
+    environment:
+      ROLE: gateway
+      NODE_ID: gateway
+    depends_on:
+      - broker
+    restart: unless-stopped
+
+  dashboard:
+    build: .
+    image: fogvision-app
+    container_name: fogvision-dashboard
+    environment:
+      ROLE: dashboard
+      NODE_ID: dashboard
+    ports:
+      - "8081:8080"
+    depends_on:
+      - broker
+    restart: unless-stopped

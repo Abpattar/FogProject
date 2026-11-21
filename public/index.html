@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FogVision — Distributed Fog Computing System</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#090d15;color:#e8eef8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:22px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:12px}
+h1{margin:0;color:#63d9ff;letter-spacing:1.5px;font-size:24px;display:flex;align-items:center;gap:10px}
+.header-actions{display:flex;align-items:center;gap:12px}
+.badge{background:#172e47;color:#63d9ff;font-size:12px;font-weight:600;padding:6px 12px;border-radius:6px;border:1px solid #23486e;letter-spacing:0.5px}
+.sub{color:#8192a9;font-size:13px;margin-top:4px}
+
+/* Start/Pause Control Button */
+.btn-control{
+  padding:8px 18px;
+  font-size:13px;
+  font-weight:bold;
+  border-radius:6px;
+  cursor:pointer;
+  transition:all 0.2s ease;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  border:1px solid transparent;
+}
+.btn-pause{
+  background:#3b1b22;
+  color:#ff6b81;
+  border-color:#5c2431;
+}
+.btn-pause:hover{
+  background:#52222d;
+  box-shadow:0 0 12px rgba(255,107,129,0.3);
+}
+.btn-resume{
+  background:#14382c;
+  color:#42e8b0;
+  border-color:#1e5442;
+}
+.btn-resume:hover{
+  background:#1c4f3e;
+  box-shadow:0 0 12px rgba(66,232,176,0.3);
+}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.card{background:#111b29;border:1px solid #26384d;border-radius:10px;padding:16px}
+.card small{color:#8da4ba;font-size:11px;font-weight:600;letter-spacing:1px}
+.card strong{display:block;font-size:26px;margin-top:8px}
+.online{color:#4ce6a1}
+.warning{color:#ffb347}
+.main-grid{display:grid;grid-template-columns:1fr 400px;gap:20px;margin-top:20px}
+@media(max-width:1100px){.main-grid{grid-template-columns:1fr}}
+
+.video-panel{background:#101925;border:1px solid #26384d;border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.video-wrapper{position:relative;width:100%;max-height:480px;aspect-ratio:4/3;background:#05080f;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.video-wrapper img{width:100%;height:100%;object-fit:contain;display:block}
+.video-wrapper canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.pause-banner{
+  position:absolute;
+  top:14px;
+  background:rgba(255,107,129,0.9);
+  color:#fff;
+  padding:6px 16px;
+  border-radius:20px;
+  font-size:12px;
+  font-weight:bold;
+  letter-spacing:1px;
+  box-shadow:0 4px 15px rgba(0,0,0,0.5);
+  pointer-events:none;
+}
+.video-info{padding:12px;border-top:1px solid #26384d;display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:13px;color:#91a9bf;background:#0d141e}
+
+/* Confidence Filter Buttons */
+.conf-filter-wrapper{display:flex;align-items:center;gap:6px;margin-left:auto}
+.conf-filter-wrapper span{color:#8da4ba;font-size:12px;font-weight:600}
+.conf-btn{background:#172638;border:1px solid #283e58;color:#8da4ba;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;transition:all 0.15s ease}
+.conf-btn:hover{background:#233954;color:#e8eef8}
+.conf-btn.active{background:#00e5ff;color:#090d15;font-weight:bold;border-color:#00e5ff}
+
+.side-panel{display:flex;flex-direction:column;gap:16px}
+.network{background:#101925;border:1px solid #26384d;border-radius:12px;padding:16px;overflow-x:auto}
+.network h3{margin:0 0 8px 0;color:#63d9ff;font-size:14px;letter-spacing:1px}
+svg{width:100%;min-width:380px;height:auto}
+.edge{stroke:#2a3e54;stroke-width:3;fill:none}
+.edge.pulse{stroke:#42e8b0;stroke-width:5;stroke-dasharray:9 7;animation:flow .55s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-32}}
+.node{fill:#132333;stroke:#3e6382;stroke-width:2}
+.node.online{stroke:#4ce6a1}
+.node.camera{fill:#1a2838;stroke:#4078a5}
+.node.fog{fill:#163528;stroke:#42e8b0}
+.node.gateway{fill:#382d1b;stroke:#f5a623}
+.node.cloud{fill:#2b1d3a;stroke:#bd10e0}
+text{fill:#e8eef8;font-size:13px;text-anchor:middle}
+.label{fill:#8ba1b8;font-size:10px;font-weight:bold;letter-spacing:0.5px}
+
+.latency-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.latency-card{background:#0e1724;border:1px solid #233448;border-radius:8px;padding:12px;text-align:center}
+.latency-card small{color:#8da4ba;display:block;margin-bottom:4px;font-size:11px}
+.latency-card strong{font-size:20px;color:#63d9ff}
+
+.class-counters{background:#101925;border:1px solid #26384d;border-radius:12px;padding:16px;max-height:220px;overflow-y:auto}
+.class-counters h3{margin:0 0 12px;color:#63d9ff;font-size:14px;letter-spacing:1px;display:flex;justify-content:space-between}
+.class-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #1c2b3d;font-size:13px}
+.class-row:last-child{border-bottom:none}
+.class-name{color:#e8eef8;text-transform:capitalize}
+.class-count{font-weight:bold;font-size:14px;padding:2px 10px;border-radius:12px}
+
+#logs{max-height:200px;overflow-y:auto;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;color:#a9c4d9;background:#0d141e;border:1px solid #26384d;border-radius:8px;padding:10px}
+.log{padding:5px 0;border-bottom:1px solid #1a2839;font-size:12px;line-height:1.4}
+.log:last-child{border-bottom:none}
+.log .topic{color:#42e8b0}
+.log .camera{color:#ffb347}
+.log .detection{color:#63d9ff}
+.log .time{color:#627991;margin-right:8px}
+
+@media(max-width:650px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  body{padding:12px}
+  .main-grid{grid-template-columns:1fr}
+  .conf-filter-wrapper{margin-left:0;width:100%}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>FOGVISION <span class="badge">EDGE AI · FOG SYSTEM</span></h1>
+    <div class="sub">3-Tier Edge–Fog–Cloud Architecture with Local YOLOv8 Inference</div>
+  </div>
+  <div class="header-actions">
+    <!-- Start / Stop Control Button -->
+    <button id="btn-toggle" class="btn-control btn-pause" onclick="toggleSystem()">
+      <span id="btn-icon">⏸</span> <span id="btn-text">PAUSE SYSTEM</span>
+    </button>
+    <span id="connection-pill" class="badge online">CONNECTING...</span>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="card"><small>EDGE CAMERA DETECTIONS</small><strong id="cameras">0</strong></div>
+  <div class="card"><small>FOG PROCESSED EVENTS</small><strong id="processed">0</strong></div>
+  <div class="card"><small>CLOUD DISPATCHED</small><strong id="cloud">0</strong></div>
+  <div class="card"><small>SYSTEM STATUS</small><strong class="online" id="connection">ONLINE</strong></div>
+</div>
+
+<div class="main-grid">
+  <!-- Left Side: Live Video Stream & Detection Bounding Boxes -->
+  <div class="video-panel">
+    <div class="video-wrapper">
+      <img id="camera-feed" alt="Camera Stream Loading..." />
+      <div id="pause-banner" class="pause-banner" style="display:none">⏸ FOG COMPUTING PIPELINE PAUSED</div>
+      <canvas id="detection-overlay"></canvas>
+    </div>
+    <div class="video-info">
+      <span id="video-status" style="color:#ffb347">Connecting to camera feed...</span>
+      <span id="video-fps">Stream: 5 FPS</span>
+      <span id="video-res">Res: 640x480</span>
+      <!-- Accuracy / Confidence Filter Selector -->
+      <div class="conf-filter-wrapper">
+        <span>AI Filter:</span>
+        <button class="conf-btn" id="conf-45" onclick="setConfidenceFilter(0.45)">45%</button>
+        <button class="conf-btn active" id="conf-52" onclick="setConfidenceFilter(0.52)">52% (Accurate)</button>
+        <button class="conf-btn" id="conf-65" onclick="setConfidenceFilter(0.65)">65% (Strict)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side: Fog Latency, Detected Classes & Live Network Topology -->
+  <div class="side-panel">
+    <!-- Latency Proof (Essential for Fog Computing Viva) -->
+    <div class="card latency-grid">
+      <div class="latency-card">
+        <small>FOG AI INFERENCE</small>
+        <strong id="lat-inference">-- ms</strong>
+      </div>
+      <div class="latency-card">
+        <small>FOG ENRICH</small>
+        <strong id="lat-fog">-- ms</strong>
+      </div>
+      <div class="latency-card">
+        <small>TOTAL EDGE LATENCY</small>
+        <strong id="lat-total">-- ms</strong>
+      </div>
+    </div>
+
+    <!-- Active Class Detections -->
+    <div class="card class-counters">
+      <h3>ACTIVE OBJECT DETECTIONS <span id="active-count" style="color:#8192a9;font-size:12px;font-weight:normal">0 objects</span></h3>
+      <div id="class-counters" style="color:#71879e;font-size:13px">Waiting for live detections...</div>
+    </div>
+
+    <!-- Animated Physical Topology -->
+    <div class="network">
+      <h3>DISTRIBUTED TOPOLOGY (MQTT PACKET FLOW)</h3>
+      <svg viewBox="0 0 760 210">
+        <!-- Connecting Edges -->
+        <g id="edges">
+          <path class="edge" id="cam-real-fog-1" d="M120 105 L270 105"/>
+          <path class="edge" id="fog-1-gateway" d="M370 105 L490 105"/>
+          <path class="edge" id="gateway-cloud" d="M570 105 L660 105"/>
+        </g>
+        <!-- Nodes -->
+        <g>
+          <!-- Camera Node (Edge Sensor) -->
+          <circle class="node camera online" cx="80" cy="105" r="32"/>
+          <text x="80" y="110" font-weight="bold">CAM</text>
+          <text class="label" x="80" y="155">EDGE (SENSOR)</text>
+
+          <!-- Fog Node (Local AI Compute) -->
+          <rect class="node fog online" x="270" y="70" width="100" height="70" rx="10"/>
+          <text x="320" y="105" font-weight="bold">FOG 1</text>
+          <text class="label" x="320" y="155">FOG NODE (YOLO)</text>
+
+          <!-- Gateway Node (Edge Aggregator) -->
+          <rect class="node gateway online" x="490" y="70" width="80" height="70" rx="10"/>
+          <text x="530" y="105" font-weight="bold">GATEWAY</text>
+          <text class="label" x="530" y="155">AGGREGATOR</text>
+
+          <!-- Cloud Ingestion Node (Central WAN) -->
+          <rect class="node cloud online" x="660" y="70" width="80" height="70" rx="10"/>
+          <text x="700" y="105" font-weight="bold">CLOUD</text>
+          <text class="label" x="700" y="155">WAN (APINEX)</text>
+        </g>
+      </svg>
+      <div class="sub" style="font-size:11px">Pulsing green links indicate real MQTT packets flowing through the fog pipeline.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Event Log -->
+<div class="card" style="margin-top:18px">
+  <h3 style="margin:0 0 10px;color:#63d9ff;font-size:14px;letter-spacing:1px">REAL-TIME FOG EVENT LOG</h3>
+  <div id="logs">Waiting for network telemetry...</div>
+</div>
+
+<script>
+const counts = { camera: 0, processed: 0, cloud: 0 };
+const $ = id => document.getElementById(id);
+
+let currentDetections = [];
+let isSystemRunning = true;
+let snapshotMode = false;
+let snapshotTimer = null;
+let minConfidence = 0.52; // Default 52% to filter false positives
+
+// Vibrant Category-Specific Themes (Eliminating single generic green color)
+const CLASS_THEMES = {
+  person: { color: "#00e5ff", fill: "rgba(0, 229, 255, 0.12)", badgeBg: "#003b46", text: "#00e5ff" },
+  "cell phone": { color: "#ff9100", fill: "rgba(255, 145, 0, 0.12)", badgeBg: "#4a2800", text: "#ff9100" },
+  laptop: { color: "#38bdf8", fill: "rgba(56, 189, 248, 0.12)", badgeBg: "#0c324c", text: "#38bdf8" },
+  tv: { color: "#38bdf8", fill: "rgba(56, 189, 248, 0.12)", badgeBg: "#0c324c", text: "#38bdf8" },
+  mouse: { color: "#ff9100", fill: "rgba(255, 145, 0, 0.12)", badgeBg: "#4a2800", text: "#ff9100" },
+  keyboard: { color: "#ff9100", fill: "rgba(255, 145, 0, 0.12)", badgeBg: "#4a2800", text: "#ff9100" },
+  bottle: { color: "#10b981", fill: "rgba(16, 185, 129, 0.12)", badgeBg: "#063d27", text: "#10b981" },
+  cup: { color: "#10b981", fill: "rgba(16, 185, 129, 0.12)", badgeBg: "#063d27", text: "#10b981" },
+  chair: { color: "#818cf8", fill: "rgba(129, 140, 248, 0.12)", badgeBg: "#232659", text: "#818cf8" },
+  bed: { color: "#818cf8", fill: "rgba(129, 140, 248, 0.12)", badgeBg: "#232659", text: "#818cf8" },
+  couch: { color: "#818cf8", fill: "rgba(129, 140, 248, 0.12)", badgeBg: "#232659", text: "#818cf8" },
+  backpack: { color: "#f43f5e", fill: "rgba(244, 63, 94, 0.12)", badgeBg: "#4c0519", text: "#f43f5e" },
+  book: { color: "#ec4899", fill: "rgba(236, 72, 153, 0.12)", badgeBg: "#500724", text: "#ec4899" }
+};
+const DEFAULT_THEME = { color: "#fbbf24", fill: "rgba(251, 191, 36, 0.12)", badgeBg: "#422006", text: "#fbbf24" };
+
+function getTheme(className) {
+  return CLASS_THEMES[(className || "").toLowerCase()] || DEFAULT_THEME;
+}
+
+function setConfidenceFilter(val) {
+  minConfidence = val;
+  document.querySelectorAll(".conf-btn").forEach(btn => btn.classList.remove("active"));
+  const activeBtn = $("conf-" + Math.round(val * 100));
+  if (activeBtn) activeBtn.classList.add("active");
+  drawDetections(currentDetections);
+  log(`<span class="topic">[FILTER]</span> Minimum AI Confidence set to <strong>${Math.round(val * 100)}%</strong>`);
+}
+
+function pulse(edgeId) {
+  if (!isSystemRunning) return;
+  const el = $(edgeId);
+  if (!el) return;
+  el.classList.remove("pulse");
+  void el.getBoundingClientRect(); // trigger reflow
+  el.classList.add("pulse");
+  setTimeout(() => el.classList.remove("pulse"), 750);
+}
+
+function log(message) {
+  const row = document.createElement("div");
+  row.className = "log";
+  const time = new Date().toLocaleTimeString();
+  row.innerHTML = `<span class="time">${time}</span>${message}`;
+  $("logs").prepend(row);
+  while ($("logs").children.length > 60) $("logs").lastChild.remove();
+}
+
+function updateLatency(data) {
+  if (data.inference_ms !== undefined) {
+    $("lat-inference").textContent = data.inference_ms + " ms";
+  }
+  if (data.processingTime !== undefined) {
+    $("lat-fog").textContent = data.processingTime + " ms";
+  }
+  const total = (data.inference_ms || 0) + (data.processingTime || 0);
+  if (total > 0) {
+    $("lat-total").textContent = total + " ms";
+  }
+}
+
+function updateClassCounters(counts) {
+  if (!counts || Object.keys(counts).length === 0) {
+    $("class-counters").innerHTML = `<span style="color:#71879e">No objects detected in current frame</span>`;
+    $("active-count").textContent = "0 objects";
+    return;
+  }
+
+  let totalObjects = 0;
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+
+  const html = entries.map(([cls, cnt]) => {
+    totalObjects += cnt;
+    const theme = getTheme(cls);
+    return `
+      <div class="class-row">
+        <span class="class-name" style="display:flex;align-items:center;gap:8px">
+          <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${theme.color};box-shadow:0 0 6px ${theme.color}88"></span>
+          ${cls}
+        </span>
+        <span class="class-count" style="color:${theme.color};background:${theme.badgeBg};border:1px solid ${theme.color}44">${cnt}</span>
+      </div>
+    `;
+  }).join("");
+
+  $("class-counters").innerHTML = html;
+  $("active-count").textContent = `${totalObjects} detected`;
+}
+
+const CLASS_MIN_CONF = { person: 0.68, chair: 0.50, bed: 0.50, couch: 0.50 };
+
+function isValidDetection(d) {
+  if (!d || !d.class) return false;
+  const req = Math.max(minConfidence, CLASS_MIN_CONF[d.class.toLowerCase()] || 0.45);
+  return (d.confidence || 0) >= req;
+}
+
+function drawDetections(detections) {
+  const canvas = $("detection-overlay");
+  const img = $("camera-feed");
+  if (!canvas || !img) return;
+
+  const rect = img.getBoundingClientRect();
+  if (canvas.width !== rect.width || canvas.height !== rect.height) {
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+  }
+
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!isSystemRunning) return;
+  if (!detections || detections.length === 0) return;
+
+  // Filter out false positives (e.g. blankets detected as person at < 68%)
+  const validDetections = detections.filter(isValidDetection);
+  if (validDetections.length === 0) return;
+
+  const srcW = img.naturalWidth || 640;
+  const srcH = img.naturalHeight || 480;
+
+  const scaleX = canvas.width / srcW;
+  const scaleY = canvas.height / srcH;
+
+  validDetections.forEach(d => {
+    const [x, y, w, h] = d.bbox;
+    const sx = x * scaleX;
+    const sy = y * scaleY;
+    const sw = w * scaleX;
+    const sh = h * scaleY;
+
+    const theme = getTheme(d.class);
+
+    // Subtle Box Backdrop Fill
+    ctx.fillStyle = theme.fill;
+    ctx.fillRect(sx, sy, sw, sh);
+
+    // Box Outline
+    ctx.strokeStyle = theme.color;
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(sx, sy, sw, sh);
+
+    // Label Text & Rounded Badge
+    const label = `${d.class.toUpperCase()} ${(d.confidence * 100).toFixed(0)}%`;
+    ctx.font = 'bold 12px ui-monospace, sans-serif';
+    const textW = ctx.measureText(label).width;
+
+    ctx.fillStyle = theme.badgeBg;
+    const badgeY = sy > 24 ? sy - 22 : sy + 4;
+    ctx.fillRect(sx, badgeY, textW + 12, 20);
+
+    ctx.strokeStyle = theme.color;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(sx, badgeY, textW + 12, 20);
+
+    ctx.fillStyle = theme.color;
+    ctx.fillText(label, sx + 6, badgeY + 14);
+  });
+}
+
+window.addEventListener('resize', () => {
+  drawDetections(currentDetections);
+});
+
+// Control Plane Start/Stop Toggle
+function setSystemState(running) {
+  isSystemRunning = running;
+  const btn = $("btn-toggle");
+  const icon = $("btn-icon");
+  const text = $("btn-text");
+  const banner = $("pause-banner");
+  const conn = $("connection");
+
+  if (isSystemRunning) {
+    btn.className = "btn-control btn-pause";
+    icon.textContent = "⏸";
+    text.textContent = "PAUSE SYSTEM";
+    banner.style.display = "none";
+    conn.textContent = "ONLINE";
+    conn.className = "online";
+  } else {
+    btn.className = "btn-control btn-resume";
+    icon.textContent = "▶";
+    text.textContent = "RESUME SYSTEM";
+    banner.style.display = "block";
+    conn.textContent = "PAUSED";
+    conn.className = "warning";
+    const canvas = $("detection-overlay");
+    if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+async function toggleSystem() {
+  try {
+    const target = isSystemRunning ? "pause" : "resume";
+    const res = await fetch(`/api/control?action=${target}`);
+    const data = await res.json();
+    setSystemState(data.isRunning);
+    log(`<span class="topic">[CONTROL PLANE]</span> User triggered: <strong>${target.toUpperCase()}</strong>`);
+  } catch (err) {
+    console.error("Control toggle failed:", err);
+  }
+}
+
+function connectWebSocket() {
+  const wsUrl = `ws://${location.host}`;
+  const ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    $("connection-pill").textContent = "CONNECTED";
+    $("connection-pill").className = "badge online";
+    log(`<span class="topic">[SYSTEM]</span> Dashboard connected to Fog WebSocket gateway`);
+  };
+
+  ws.onclose = () => {
+    $("connection-pill").textContent = "RECONNECTING...";
+    $("connection-pill").className = "badge warning";
+    setTimeout(connectWebSocket, 2000);
+  };
+
+  ws.onmessage = e => {
+    try {
+      const event = JSON.parse(e.data);
+      const d = event.data;
+      const topic = event.topic;
+
+      // System Control State Event
+      if (topic === "fog/control") {
+        setSystemState(d.isRunning !== false && d.action !== "pause");
+        log(`<span class="topic">[CONTROL]</span> System is now: <strong>${isSystemRunning ? 'ACTIVE' : 'PAUSED'}</strong>`);
+        return;
+      }
+
+      if (!isSystemRunning) return;
+
+      // Camera Detections Event
+      if (topic.startsWith("camera/") && topic.endsWith("/detections")) {
+        counts.camera++;
+        $("cameras").textContent = counts.camera;
+        pulse("cam-real-fog-1");
+
+        currentDetections = d.detections || [];
+        drawDetections(currentDetections);
+
+        // Filter counts and summary by per-class threshold
+        const filteredCounts = {};
+        const validDets = currentDetections.filter(isValidDetection);
+        validDets.forEach(item => {
+          filteredCounts[item.class] = (filteredCounts[item.class] || 0) + 1;
+        });
+
+        updateClassCounters(filteredCounts);
+        updateLatency(d);
+
+        const summary = validDets.length
+          ? validDets.map(x => `${x.class} (${(x.confidence*100).toFixed(0)}%)`).join(", ")
+          : "None";
+
+        log(`<span class="camera">[EDGE CAMERA]</span> Frame #${d.sequence || counts.camera} detected: <span class="detection">${summary}</span> (YOLO: ${d.inference_ms}ms)`);
+      }
+
+      // Fog Processed Event
+      if (topic.startsWith("fog/")) {
+        counts.processed++;
+        $("processed").textContent = counts.processed;
+        pulse("fog-1-gateway");
+        updateLatency(d);
+        log(`<span class="topic">[FOG NODE]</span> ${d.fogNode} enriched metadata for ${d.camera} | Transit/Enrich: ${d.processingTime}ms`);
+      }
+
+      // Cloud Received Event
+      if (topic === "cloud/received") {
+        counts.cloud++;
+        $("cloud").textContent = counts.cloud;
+        pulse("gateway-cloud");
+        log(`<span style="color:#bd10e0">[CLOUD INGEST]</span> Dispatched event upstream from ${d.fogNode} to Cloud API`);
+      }
+
+      // Node Status Heartbeat
+      if (topic.startsWith("node/")) {
+        const role = d.role ? ` (${d.role})` : '';
+        log(`<span class="online">[NODE HEARTBEAT]</span> ${d.node}${role} is ${d.status}`);
+      }
+    } catch (err) {
+      console.error("WebSocket message parse error:", err);
+    }
+  };
+}
+
+// Stream & Snapshot Loading
+const imgFeed = $("camera-feed");
+
+function startSnapshotLoop() {
+  if (snapshotTimer) return;
+  snapshotMode = true;
+  $("video-status").textContent = "Live Snapshot Mode (Fallback)";
+  $("video-status").style.color = "#4ce6a1";
+
+  const fetchNextSnapshot = () => {
+    if (!snapshotMode) return;
+    const nextImg = new Image();
+    nextImg.onload = () => {
+      imgFeed.src = nextImg.src;
+      $("video-res").textContent = `Res: ${nextImg.naturalWidth}x${nextImg.naturalHeight}`;
+      snapshotTimer = setTimeout(fetchNextSnapshot, 150); // ~6.6 FPS
+    };
+    nextImg.onerror = () => {
+      snapshotTimer = setTimeout(fetchNextSnapshot, 1000);
+    };
+    nextImg.src = `/api/snapshot?t=${Date.now()}`;
+  };
+
+  fetchNextSnapshot();
+}
+
+function loadLiveStream() {
+  imgFeed.src = `/api/stream?t=${Date.now()}`;
+}
+
+imgFeed.onload = () => {
+  if (!snapshotMode) {
+    $("video-status").textContent = "Live Video Stream Active";
+    $("video-status").style.color = "#4ce6a1";
+    $("video-res").textContent = `Res: ${imgFeed.naturalWidth || 640}x${imgFeed.naturalHeight || 480}`;
+  }
+};
+
+imgFeed.onerror = () => {
+  console.warn("Direct stream hit an error, activating rapid snapshot fallback mode...");
+  startSnapshotLoop();
+};
+
+loadLiveStream();
+connectWebSocket();
+</script>
+
+</body>
+</html>
